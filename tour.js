@@ -1,4 +1,4 @@
-/* Clean controls: floor logo + image buttons (prev/enter/next)
+/* Clean controls: floor logo + image buttons (prev/enter/next) + VR CONTROLLERS
   360 images: Images/<scene>.jpg
   Nav icons: Images/prevb.png, Images/nextb.png, Images/enterbb.png, Images/iit.png
   Scene audio: Audio/<scene>.mp3
@@ -36,21 +36,15 @@
  const ppeClose     = document.getElementById('ppeClose');
  const ppeItems     = document.querySelectorAll('.ppe-item');
 
- let currentAudio    = null;
+ let currentAudio    = null;   // scene narration
  let currentSceneId  = null;
- let ppeAudio        = null;
+
+ let ppeAudio        = null;   // PPE instructions audio
  let ppeAudioFile    = 'others.mp3';
  let currentPpeOrder = [];
  let ppeStep         = 0;
 
- // 🔥 VR controller raycaster hotspot enable
- btnPrev.classList.add("vr-hotspot");
- btnNext.classList.add("vr-hotspot");
- btnEnter.classList.add("vr-hotspot");
-
-
- //================ NAV MAP (unchanged) =================//
-
+ // Navigation table (your exact mapping)
  const nav = {
    mainentry:{prev:"",    next:"cn1",  enter:"cn1"},
    c1:{prev:"c2",         next:"entry",enter:"c2"},
@@ -92,153 +86,378 @@
    wb2:{prev:"wb1",       next:"",     enter:""}
  };
 
+ const ICONS = {
+   prev:  `${ASSETS}prevb.png`,
+   next:  `${ASSETS}nextb.png`,
+   enter: `${ASSETS}enterbb.png`,
+   iitm:  `${ASSETS}iit.png`
+ };
 
- //================ PPE ORDER LOGIC =================//
+ // Floor logo
+ (function trySetLogo() {
+   const img = new Image();
+   img.onload  = () => floorLogo.setAttribute('src', ICONS.iitm);
+   img.onerror = () => floorLogo.setAttribute('material','color:#222; opacity:0.6');
+   img.src = ICONS.iitm;
+ })();
 
- function isLithOrChar(id) { return id.startsWith('l') || id.startsWith('ch'); }
- function isWetType(id)   { return id.startsWith('wb')||id.startsWith('gb')||id.startsWith('cr')||id.startsWith('eb'); }
+ /* -------------------- Scene Label Helper -------------------- */
+ function sceneLabel(id) {
+   if (id.startsWith('wb')) return 'Wet Bench Room';
+   if (id.startsWith('gb')) return 'Processing Room';
+   if (id.startsWith('cr')) return 'Chemical Storage Room';
+   if (id.startsWith('l'))  return 'Lithography Room';
+   if (id.startsWith('ch')) return 'Characterisation Room';
+   if (id.startsWith('eb')) return 'E-beam & Glass Cutting Room';
+   return 'Corridor';
+ }
 
- function getPPEOrderForScene(id){
-   if (isLithOrChar(id))
+ // Simple default subtitles; you can tune per scene
+ const subtitleScripts = {
+   mainentry: [
+     "Welcome to the IIT Madras CNNP MEMS & Cleanroom VR tour.",
+     "Use the navigation controls to move through corridors and lab areas."
+   ]
+ };
+
+ /* ==================== AUDIO + SUBTITLES ==================== */
+
+ function stopCurrentAudio() {
+   if (currentAudio) {
+     currentAudio.pause();
+     currentAudio.currentTime = 0;
+   }
+   progWrap.style.display = 'none';
+   subBox.style.display   = 'none';
+   progBar.style.width    = '0%';
+ }
+
+ function playSceneAudio(sceneId) {
+   stopCurrentAudio();
+   currentSceneId = sceneId;
+
+   const audioPath = `${AUDIO}${sceneId}.mp3`;
+   const audio = new Audio(audioPath);
+   currentAudio = audio;
+
+   const lines = subtitleScripts[sceneId] || [`${sceneLabel(sceneId)}`];
+   let lineIdx = 0;
+
+   subBox.style.display   = 'block';
+   progWrap.style.display = 'block';
+   subBox.textContent     = lines[0];
+
+   audio.addEventListener('timeupdate', () => {
+     if (!audio.duration || isNaN(audio.duration)) return;
+     const p = (audio.currentTime / audio.duration) * 100;
+     progBar.style.width = `${Math.min(100,p)}%`;
+   });
+
+   audio.addEventListener('ended', () => {
+     progBar.style.width = '100%';
+     if (lines.length > 1 && lineIdx < lines.length - 1) {
+       lineIdx = lines.length - 1;
+       subBox.textContent = lines[lineIdx];
+     } else {
+       subBox.textContent = `${sceneLabel(sceneId)} narration completed. You can continue exploring.`;
+     }
+   });
+
+   if (lines.length > 1) {
+     let interval = setInterval(() => {
+       if (!audio || audio.paused || !audio.duration) return;
+       const chunk  = audio.duration / lines.length;
+       const newIdx = Math.floor(audio.currentTime / (chunk || 1));
+       if (newIdx !== lineIdx && newIdx < lines.length) {
+         lineIdx = newIdx;
+         subBox.textContent = lines[lineIdx];
+       }
+     }, 500);
+     audio.addEventListener('ended', () => clearInterval(interval));
+   }
+
+   audio.play().catch(() => {
+     // autoplay blocked
+     subBox.textContent = lines[0];
+     progBar.style.width = '0%';
+   });
+ }
+
+ if (btnAudioPlay) {
+   btnAudioPlay.addEventListener('click', () => {
+     if (!currentSceneId) return;
+     if (currentAudio) currentAudio.play();
+     else playSceneAudio(currentSceneId);
+   });
+ }
+ if (btnAudioStop) {
+   btnAudioStop.addEventListener('click', () => {
+     stopCurrentAudio();
+   });
+ }
+ if (btnAudioReplay) {
+   btnAudioReplay.addEventListener('click', () => {
+     if (!currentSceneId) return;
+     playSceneAudio(currentSceneId);
+   });
+ }
+
+ /* ==================== PPE GAME LOGIC ==================== */
+
+ function isLithOrChar(id) {
+   return id.startsWith('l') || id.startsWith('ch');
+ }
+
+ function isWetType(id) {
+   return id.startsWith('wb') || id.startsWith('gb') || id.startsWith('cr') || id.startsWith('eb');
+ }
+
+ // Order logic:
+ // Litho/Char: gown → shoe cover → boot → blue glove → purple glove → hair net → mask → goggle
+ // Wet/others: lab coat → shoe cover → shoe → blue glove → purple glove → hair net → mask → goggle
+ function getPPEOrderForScene(id) {
+   if (isLithOrChar(id)) {
      return ["ppe6","ppe7","ppe8","ppe10","ppe9","ppe3","ppe4","ppe5"];
-
+   }
+   if (isWetType(id)) {
+     return ["ppe1","ppe7","ppe2","ppe10","ppe9","ppe3","ppe4","ppe5"];
+   }
+   // default: treat as wet lab / general lab
    return ["ppe1","ppe7","ppe2","ppe10","ppe9","ppe3","ppe4","ppe5"];
  }
 
- function resetPPEGame(){
+ function resetPPEGame() {
    ppeStep = 0;
-   ppeMsg.textContent = "Tap “Cleanroom PPE Test” to begin.";
+   ppeMsg.textContent = "Tap "Cleanroom PPE Test" to begin.";
    ppePanel.style.display = 'none';
-
-   if (ppeAudio){ ppeAudio.pause(); ppeAudio.currentTime = 0; }
-   ppeItems.forEach(el=>{ el.classList.remove("selected"); el.style.opacity="1"; });
+   if (ppeAudio) {
+     ppeAudio.pause();
+     ppeAudio.currentTime = 0;
+   }
+   ppeItems.forEach(el => {
+     el.classList.remove('selected');
+     el.style.opacity = '1';
+   });
  }
 
- function updatePPEForScene(id){
-   ppeSceneType.textContent = sceneLabel(id);
+ function updatePPEForScene(id) {
+   const label = sceneLabel(id);
+   ppeSceneType.textContent = label;
    currentPpeOrder = getPPEOrderForScene(id);
-   ppeAudioFile = isLithOrChar(id) ? "cl.mp3" : "others.mp3";
+   ppeAudioFile = isLithOrChar(id) ? 'cl.mp3' : 'others.mp3';
    resetPPEGame();
  }
 
+ if (ppeToggle) {
+   ppeToggle.addEventListener('click', () => {
+     if (!currentSceneId) return;
+     resetPPEGame();
+     // stop scene narration when PPE instructions play
+     stopCurrentAudio();
 
- //============ AUDIO CORE ============//
+     ppeMsg.textContent = "Playing gowning instruction audio...";
+     ppeAudio = new Audio(`${AUDIO}${ppeAudioFile}`);
 
- function stopCurrentAudio(){
-   if(currentAudio){ currentAudio.pause(); currentAudio.currentTime=0; }
-   progWrap.style.display="none"; subBox.style.display="none"; progBar.style.width="0%";
- }
+     ppeAudio.onended = () => {
+       ppePanel.style.display = 'flex';
+       ppeMsg.textContent = "Select PPE items in the correct gowning order.";
+     };
 
- function playSceneAudio(id){
-   stopCurrentAudio();
-   currentSceneId=id;
-
-   currentAudio=new Audio(`${AUDIO}${id}.mp3`);
-   const lines=[`${sceneLabel(id)}`];
-   let i=0;
-
-   subBox.style.display="block"; progWrap.style.display="block";
-   subBox.textContent=lines[0];
-
-   currentAudio.addEventListener("timeupdate",()=>{
-     if(currentAudio.duration){
-       progBar.style.width=((currentAudio.currentTime/currentAudio.duration)*100)+"%";
-     }
-   });
-
-   currentAudio.play().catch(()=>{});
- }
-
-
- //==== UI BUTTON CLICK ====/ (mouse works already)
- btnAudioPlay.addEventListener("click",()=>currentAudio?currentAudio.play():playSceneAudio(currentSceneId));
- btnAudioStop.addEventListener("click",stopCurrentAudio);
- btnAudioReplay.addEventListener("click",()=>playSceneAudio(currentSceneId));
-
- ppeToggle.addEventListener("click",()=>{
-   if(!currentSceneId) return;
-   stopCurrentAudio(); resetPPEGame();
-
-   ppeMsg.textContent="Playing gowning instruction audio...";
-   ppeAudio=new Audio(`${AUDIO}${ppeAudioFile}`);
-
-   ppeAudio.onended=()=>{
-     ppePanel.style.display="flex";
-     ppeMsg.textContent="Select PPE items in correct order.";
-   };
-
-   ppeAudio.play().catch(()=>{
-     ppePanel.style.display="flex";
-     ppeMsg.textContent="Select PPE Items.";
-   })
- });
-
- ppeClose.addEventListener("click", resetPPEGame);
-
- ppeItems.forEach(el=>{
-   el.addEventListener("click",()=>{
-     const id=el.dataset.id;
-     if(id===currentPpeOrder[ppeStep]){
-       el.classList.add("selected"); el.style.opacity="0.3"; ppeStep++;
-       if(ppeStep===currentPpeOrder.length) ppeMsg.textContent="✔ PPE Complete!";
-       else ppeMsg.textContent="Correct → Next item";
-     }
-     else ppeMsg.textContent="Wrong item — try again.";
-   });
- });
-
-
- //============ SCENE SYSTEM ============//
-
- function sceneLabel(id){
-   if(id.startsWith("wb"))return"Wet Bench Room";
-   if(id.startsWith("gb"))return"Processing Room";
-   if(id.startsWith("cr"))return"Chemical Storage Room";
-   if(id.startsWith("l")) return"Lithography Room";
-   if(id.startsWith("ch"))return"Characterisation Room";
-   if(id.startsWith("eb"))return"E-Beam + Glass Cutting";
-   return "Corridor";
- }
-
- function gotoScene(id){ if(id) loadScene(id); }
-
- function loadScene(id){
-   currentSceneId=id;
-   sky.setAttribute("src",`${ASSETS}${id}.jpg`);
-   updatePPEForScene(id);
-   playSceneAudio(id);
-
-   const cfg=nav[id]||{};
-   btnPrev.onclick=()=>gotoScene(cfg.prev);
-   btnNext.onclick=()=>gotoScene(cfg.next);
-   btnEnter.onclick=()=>gotoScene(cfg.enter);
- }
-
-
- //============= VR CONTROLLER EVENTS 🔥=============//
-
- /** 
-  * Controller fires → ray hits a-plane → JS triggers original HTML click
-  * This keeps your entire UI design unchanged.
- **/
- document.querySelectorAll(".vr-hotspot").forEach(el=>{
-   el.addEventListener("click",()=>{ el.object3D.visible=true; el.click(); });
- });
-
- AFRAME.registerComponent("controller-click",{
-   init(){
-     this.el.addEventListener("triggerdown",()=>{
-       let p=document.querySelector("[raycaster]").components.raycaster.intersectedEls[0];
-       if(p) p.emit("click");
+     ppeAudio.play().catch(() => {
+       // if blocked
+       ppePanel.style.display = 'flex';
+       ppeMsg.textContent = "Select PPE items in the correct gowning order.";
      });
-   }
+   });
+ }
+
+ if (ppeClose) {
+   ppeClose.addEventListener('click', () => {
+     resetPPEGame();
+   });
+ }
+
+ ppeItems.forEach(el => {
+   el.addEventListener('click', () => {
+     if (!currentPpeOrder || !currentPpeOrder.length) return;
+     if (ppePanel.style.display === 'none') return;
+
+     const id = el.dataset.id;
+     const expected = currentPpeOrder[ppeStep];
+
+     if (id === expected) {
+       el.classList.add('selected');
+       el.style.opacity = '0.3';
+       ppeStep++;
+
+       if (ppeStep === currentPpeOrder.length) {
+         ppeMsg.textContent = "✅ Gowning sequence completed correctly. You are cleanroom ready!";
+       } else {
+         ppeMsg.textContent = `✔ Correct. Select step ${ppeStep + 1} next.`;
+       }
+     } else {
+       ppeMsg.textContent = "❌ Incorrect item. Re-check the gowning order and try again.";
+     }
+   });
  });
 
+ /* ==================== NAVIGATION & UI ==================== */
 
- //============ INIT ============//
+ // VR CONTROLLER SUPPORT - Handle controller raycaster events
+ function setupVRControllers() {
+   const leftController = document.getElementById('left-controller');
+   const rightController = document.getElementById('right-controller');
+   
+   [leftController, rightController].forEach(controller => {
+     if (!controller) return;
+     
+     // Trigger events on controller button press
+     controller.addEventListener('raycaster-intersection', (evt) => {
+       const intersects = evt.detail.els;
+       const target = intersects[0];
+       if (target && target.classList.contains('clickable')) {
+         target.emit('click');
+       }
+     });
+     
+     // Handle controller trigger/button press
+     controller.addEventListener('triggerdown', (evt) => {
+       const intersects = controller.components.raycaster.intersections || [];
+       const target = intersects[0]?.el;
+       if (target && target.classList.contains('clickable')) {
+         target.emit('click');
+       }
+     });
+   });
+ }
 
- window.addEventListener("DOMContentLoaded",()=>{
+ // Helper to safely set a nav button (keeps your original structure + VR support)
+ function setButtonPlane(btnEl, iconPath, targetId) {
+   // remove old listeners
+   btnEl.onclick = null;
+   btnEl.removeEventListener('click', btnEl._listener);
+   btnEl.removeEventListener('touchstart', btnEl._listener);
+
+   if (!targetId || targetId === '') {
+     btnEl.setAttribute('visible','false');
+     return;
+   }
+
+   const test = new Image();
+   test.onload = () => {
+     btnEl.setAttribute('src', iconPath);
+     btnEl.setAttribute('material','transparent:true;');
+     btnEl.setAttribute('visible','true');
+   };
+   test.onerror = () => {
+     btnEl.setAttribute('material','color:#37474f; opacity:0.95');
+     btnEl.setAttribute('visible','true');
+   };
+   test.src = iconPath;
+
+   const listener = (evt) => {
+     evt && evt.stopPropagation();
+     gotoScene(targetId);
+   };
+   btnEl._listener = listener;
+   btnEl.addEventListener('click', listener);
+   btnEl.addEventListener('touchstart', listener);
+ }
+
+ // Rotate nav panel to always face camera, but keep position fixed (so no "dancing")
+ function orientPanelToCamera() {
+   if (!camera || !navPanel || !window.THREE) return;
+   const camWorldPos = new THREE.Vector3();
+   camera.object3D.getWorldPosition(camWorldPos);
+
+   const panelObj  = navPanel.object3D;
+   const panelPos  = new THREE.Vector3();
+   panelObj.getWorldPosition(panelPos);
+
+   const lookAt = camWorldPos.clone();
+   lookAt.y = panelPos.y; // same height → no tilting up/down
+   panelObj.lookAt(lookAt);
+ }
+
+ // Load a panorama and update visible buttons per table
+ function loadScene(id) {
+   if (!id) return;
+   currentSceneId = id;
+
+   FADE.classList.add('on');
+   setTimeout(() => {
+     sky.setAttribute('src', `${ASSETS}${id}.jpg`);
+
+     const cfg = nav[id] || {prev:'', next:'', enter:''};
+     setButtonPlane(btnPrev,  ICONS.prev,  cfg.prev);
+     setButtonPlane(btnNext,  ICONS.next,  cfg.next);
+     setButtonPlane(btnEnter, ICONS.enter, cfg.enter);
+
+     const hasPrev  = cfg.prev  && cfg.prev  !== '';
+     const hasNext  = cfg.next  && cfg.next  !== '';
+     const hasEnter = cfg.enter && cfg.enter !== '';
+
+     const leftX   = -0.6, centerX = 0, rightX = 0.6;
+
+     if (hasPrev && !hasEnter && !hasNext) {
+       btnPrev.setAttribute('position', `${centerX} 0 0`);
+     } else if (!hasPrev && hasEnter && !hasNext) {
+       btnEnter.setAttribute('position', `${centerX} 0 0`);
+     } else if (!hasPrev && !hasEnter && hasNext) {
+       btnNext.setAttribute('position', `${centerX} 0 0`);
+     } else {
+       btnPrev.setAttribute('position',
+         hasPrev ? `${(hasEnter || hasNext) ? leftX : centerX} 0 0` : `${leftX} 0 0`);
+       btnEnter.setAttribute('position', `${centerX} 0 0`);
+       btnNext.setAttribute('position',
+         hasNext ? `${(hasEnter || hasPrev) ? rightX : centerX} 0 0` : `${rightX} 0 0`);
+     }
+
+     // Update PPE context for this scene
+     updatePPEForScene(id);
+
+     // Preload neighbors
+     const neighbors = [];
+     if (cfg.prev)  neighbors.push(cfg.prev);
+     if (cfg.next)  neighbors.push(cfg.next);
+     if (cfg.enter) neighbors.push(cfg.enter);
+     neighbors.forEach(n => {
+       const img = new Image();
+       img.src = `${ASSETS}${n}.jpg`;
+     });
+
+     // Auto-play narration for this scene
+     playSceneAudio(id);
+
+     FADE.classList.remove('on');
+   }, 220);
+ }
+
+ function gotoScene(target) {
+   if (!target) return;
+   loadScene(target);
+ }
+
+ function tickOrient() {
+   orientPanelToCamera();
+   requestAnimationFrame(tickOrient);
+ }
+
+ function preloadAll() {
+   Object.keys(nav).forEach(k => {
+     const img = new Image();
+     img.src = `${ASSETS}${k}.jpg`;
+   });
+ }
+
+ // init
+ window.addEventListener('DOMContentLoaded', () => {
+   preloadAll();
    loadScene(START);
+   setTimeout(() => {
+     tickOrient();
+     setupVRControllers(); // ADD VR CONTROLLER SUPPORT
+   }, 120);
  });
 
 })();
