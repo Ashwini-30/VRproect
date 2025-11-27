@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>IITM MEMS Lab — Clean VR Controls</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <style>
+    html,body {
+      margin:0;
+      height:100%;
+      background:#000;
+      font-family:Poppins,"Segoe UI",system-ui,sans-serif;
+    }
+    #fade {
+      position:absolute; left:0; top:0; right:0; bottom:0;
+      background:#000; pointer-events:none;
+      opacity:0; transition:opacity .35s ease; z-index:9;
+    }
+    #fade.on { opacity:1; pointer-events:auto; }
+
+    /* ============ AUDIO UI (TOP RIGHT) ============ */
+    #audioUI {
+      position:fixed;
+      top:16px;
+      right:16px;
+      display:flex;
+      gap:12px;
+      z-index:50;
+    }
+    .audioBtn {
+      width:64px;
+      height:64px;
+      border-radius:18px;
+      background:rgba(0,0,0,0.7);
+      border:2px solid #00eaff;
+      backdrop-filter:blur(10px);
+      box-shadow:0 0 18px rgba(0,238,255,0.65);
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      transition:transform .18s ease, box-shadow .18s ease;
+    }
+    .audioBtn img {
+      width:72%;
+      height:72%;
+      object-fit:contain;
+      pointer-events:none;
+    }
+    .audioBtn:hover {
+      transform:scale(1.1);
+      box-shadow:0 0 26px rgba(0,238,255,0.95);
+    }
+
+    /* ============ SUBTITLES & PROGRESS ============ */
+    #subtitles {
+      position:fixed;
+      left:50%;
+      bottom:58px;
+      transform:translateX(-50%);
+      padding:10px 18px;
+      max-width:72%;
+      border-radius:12px;
+      background:rgba(0,0,0,0.75);
+      border:1px solid rgba(0,238,255,0.8);
+      color:#fff;
+      font-size:16px;
+      text-align:center;
+      z-index:40;
+      display:none;
+    }
+    #progressWrap {
+      position:fixed;
+      left:50%;
+      bottom:32px;
+      transform:translateX(-50%);
+      width:60%;
+      height:6px;
+      border-radius:999px;
+      background:rgba(255,255,255,0.18);
+      overflow:hidden;
+      z-index:40;
+      display:none;
+    }
+    #progressBar {
+      width:0%;
+      height:100%;
+      background:#00eaff;
+      border-radius:999px;
+      transition:width .2s linear;
+    }
+
+    /* ============ PPE GAME UI (TOP LEFT) ============ */
+    #ppeUI {
+      position:fixed;
+      top:90px;
+      left:16px;
+      z-index:50;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    #ppeToggle {
+      padding:8px 14px;
+      border-radius:10px;
+      border:1px solid #ffb300;
+      background:rgba(0,0,0,0.7);
+      color:#ffd770;
+      font-size:14px;
+      cursor:pointer;
+      box-shadow:0 0 14px rgba(255,183,0,0.7);
+      backdrop-filter:blur(6px);
+      transition:transform .15s ease, box-shadow .15s ease;
+      text-align:center;
+      white-space:nowrap;
+    }
+    #ppeToggle:hover {
+      transform:scale(1.05);
+      box-shadow:0 0 20px rgba(255,183,0,0.95);
+    }
+
+    #ppePanel {
+      width:260px;
+      padding:10px 12px 12px;
+      border-radius:14px;
+      background:rgba(0,0,0,0.85);
+      border:1px solid rgba(255,183,0,0.9);
+      box-shadow:0 0 22px rgba(255,183,0,0.85);
+      display:none;
+      flex-direction:column;
+      gap:8px;
+      color:#fff;
+      font-size:13px;
+    }
+    #ppeHeader {
+      font-weight:600;
+      font-size:14px;
+      color:#ffd770;
+    }
+    #ppeMsg {
+      font-size:13px;
+      line-height:1.3;
+      min-height:36px;
+    }
+    #ppeGrid {
+      display:grid;
+      grid-template-columns:repeat(5, 1fr);
+      gap:6px;
+      justify-items:center;
+      margin-top:4px;
+    }
+    .ppe-item {
+      width:44px;
+      height:44px;
+      border-radius:10px;
+      border:2px solid transparent;
+      background:rgba(255,255,255,0.05);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      transition:transform .15s ease, border-color .15s ease, opacity .15s ease;
+    }
+    .ppe-item img {
+      width:80%;
+      height:80%;
+      object-fit:contain;
+      pointer-events:none;
+    }
+    .ppe-item:hover {
+      transform:translateY(-2px) scale(1.06);
+      border-color:rgba(255,183,0,0.95);
+    }
+    .ppe-item.selected {
+      opacity:0.35;
+      border-color:#00eaff;
+    }
+    #ppeFooter {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin-top:4px;
+    }
+    #ppeClose {
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid #ff7676;
+      background:rgba(255,0,0,0.12);
+      color:#ffb3b3;
+      font-size:12px;
+      cursor:pointer;
+    }
+    #ppeSceneType {
+      font-size:11px;
+      opacity:0.85;
+    }
+  </style>
+</head>
+<body>
+  <div id="fade"></div>
+
+  <!-- 🔊 AUDIO CONTROL OVERLAY -->
+  <!-- Icons must exist as Images/start.png, Images/stop.png, Images/replay.png -->
+  <div id="audioUI">
+    <button id="btnAudioPlay"   class="audioBtn"><img src="Images/start.png"  alt="Play"></button>
+    <button id="btnAudioStop"   class="audioBtn"><img src="Images/stop.png"   alt="Stop"></button>
+    <button id="btnAudioReplay" class="audioBtn"><img src="Images/replay.png" alt="Replay"></button>
+  </div>
+
+  <!-- 📜 SUBTITLES + PROGRESS -->
+  <div id="subtitles"></div>
+  <div id="progressWrap"><div id="progressBar"></div></div>
+
+  <!-- 🧤 PPE GAME OVERLAY (TOP LEFT) -->
+  <div id="ppeUI">
+    <button id="ppeToggle">Cleanroom PPE Test</button>
+
+    <div id="ppePanel">
+      <div id="ppeHeader">Gowning Sequence Practice</div>
+      <div id="ppeMsg">Tap “Cleanroom PPE Test” to begin.</div>
+
+      <div id="ppeGrid">
+        <div class="ppe-item" data-id="ppe1"><img src="Images/ppe_labcoat.png" /></div>
+        <div class="ppe-item" data-id="ppe2"><img src="Images/ppe_shoe.png" /></div>
+        <div class="ppe-item" data-id="ppe3"><img src="Images/ppe_hairnet.png" /></div>
+        <div class="ppe-item" data-id="ppe4"><img src="Images/ppe_mask.png" /></div>
+        <div class="ppe-item" data-id="ppe5"><img src="Images/ppe_goggle.png" /></div>
+
+        <div class="ppe-item" data-id="ppe6"><img src="Images/ppe_gown.png" /></div>
+        <div class="ppe-item" data-id="ppe7"><img src="Images/ppe_shoecover.png" /></div>
+        <div class="ppe-item" data-id="ppe8"><img src="Images/ppe_boot.png" /></div>
+        <div class="ppe-item" data-id="ppe9"><img src="Images/ppe_purpleglove.png" /></div>
+        <div class="ppe-item" data-id="ppe10"><img src="Images/ppe_glove_blue.png" /></div>
+      </div>
+
+      <div id="ppeFooter">
+        <span id="ppeSceneType"></span>
+        <button id="ppeClose">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <a-scene vr-mode-ui="enabled: true" embedded>
+
+    <!-- SKY / PANORAMA -->
+    <a-sky id="sky" radius="500" rotation="0 -90 0"></a-sky>
+
+    <!-- CAMERA + CURSOR (mouse + gaze) -->
+    <a-entity id="cameraRig">
+      <a-entity id="camera" camera look-controls position="0 1.6 0">
+        <a-entity id="cursor" cursor="fuse:false; rayOrigin:mouse"
+                  raycaster="objects: .clickable"
+                  position="0 0 -0.6"
+                  geometry="primitive: ring; radiusInner:0.02; radiusOuter:0.035"
+                  material="shader:flat; color:#fff">
+        </a-entity>
+      </a-entity>
+    </a-entity>
+
+    <!-- FLOOR LOGO (fixed bottom center) -->
+    <a-plane id="floorLogo"
+             position="0 0 0"
+             rotation="-90 0 0"
+             width="1.4" height="1.4"
+             material="transparent: true; opacity: 1"
+             src="">
+    </a-plane>
+
+    <!-- NAV PANEL (buttons sit above the logo; fixed in world, only rotates to face camera) -->
+    <a-entity id="navPanel" position="0 0.22 -1.2">
+      <a-plane id="btnPrev" class="clickable" width="1.0" height="0.8"
+               position="-4 0 0" rotation="-90 0 0" material="transparent:true" visible="false"></a-plane>
+
+      <a-plane id="btnEnter" class="clickable" width="1.0" height="0.9"
+               position="0 0 0" rotation="-90 0 0" material="transparent:true" visible="false"></a-plane>
+
+      <a-plane id="btnNext" class="clickable" width="1.0" height="0.8"
+               position="4 0 0" rotation="-90 0 0" material="transparent:true" visible="false"></a-plane>
+    </a-entity>
+
+    <a-entity light="type: ambient; intensity: 0.9"></a-entity>
+
+  </a-scene>
+
+  <script src="tour.js"></script>
+</body>
+</html>

@@ -1,0 +1,287 @@
+/* Clean controls: floor logo + image buttons (prev/enter/next)
+   Place all panorama jpgs and icons in ./assets/
+   Icons expected: assets/prev.png, assets/next.png, assets/enter.png, assets/iitm.png
+*/
+
+(() => {
+    const ASSETS = 'Images/';            // folder for panoramas & icons
+    const START = 'mainentry';           // starting panorama filename without extension
+    const FADE = document.getElementById('fade');
+  
+    // DOM refs
+    const sky = document.getElementById('sky');
+    const floorLogo = document.getElementById('floorLogo');
+    const navPanel = document.getElementById('navPanel');
+    const btnPrev = document.getElementById('btnPrev');
+    const btnNext = document.getElementById('btnNext');
+    const btnEnter = document.getElementById('btnEnter');
+    const camera = document.getElementById('camera');
+  
+    // Your prev/next/enter table (exact)
+    const nav = {
+      mainentry:{prev:"", next:"cn1", enter:"cn1"},
+      c1:{prev:"c2", next:"entry", enter:"c2"},
+      c2:{prev:"c1", next:"c3", enter:"eb1"},
+      c3:{prev:"c2", next:"c4", enter:""},
+      c4:{prev:"c3", next:"c5", enter:""},
+      c5:{prev:"c4", next:"c6", enter:""},
+      c6:{prev:"c5", next:"c7", enter:"cr"},
+      c7:{prev:"c6", next:"c8", enter:"gb1"},
+      c8:{prev:"c7", next:"cn7", enter:"wb1"},
+      cn1:{prev:"mainentry", next:"cn2", enter:""},
+      cn2:{prev:"cn1", next:"cn3", enter:""},
+      cn3:{prev:"cn2", next:"cn5", enter:"l1"},
+      cn4:{prev:"", next:"", enter:""},
+      cn5:{prev:"cn3", next:"cn6", enter:""},
+      cn6:{prev:"cn5", next:"cn7", enter:""},
+      cn7:{prev:"c8", next:"", enter:"ch1"},
+      entry:{prev:"", next:"c1", enter:"c1"},
+      ch1:{prev:"cn7", next:"ch2", enter:""},
+      ch2:{prev:"ch1", next:"ch3", enter:""},
+      ch3:{prev:"ch2", next:"ch4", enter:""},
+      ch4:{prev:"ch3", next:"ch5", enter:""},
+      ch5:{prev:"ch4", next:"ch6", enter:""},
+      ch6:{prev:"ch5", next:"ch7", enter:""},
+      ch7:{prev:"ch6", next:"", enter:""},
+      cr:{prev:"c6", next:"", enter:""},
+      eb1:{prev:"c2", next:"eb2", enter:""},
+      eb2:{prev:"eb1", next:"eb3", enter:""},
+      eb3:{prev:"eb2", next:"eb4", enter:""},
+      eb4:{prev:"eb3", next:"", enter:""},
+      gb1:{prev:"c7", next:"gb2", enter:""},
+      gb2:{prev:"gb1", next:"gb3", enter:""},
+      gb3:{prev:"gb2", next:"c8", enter:""},
+      l1:{prev:"cn3", next:"l2", enter:""},
+      l2:{prev:"l1", next:"l3", enter:""},
+      l3:{prev:"l2", next:"l4", enter:""},
+      l4:{prev:"l3", next:"", enter:""},
+      wb1:{prev:"c8", next:"wb2", enter:""},
+      wb2:{prev:"wb1", next:"", enter:""}
+    };
+  
+    // Icons (attempt to use these filenames; if missing, buttons still clickable but show plain material)
+    const ICONS = {
+      prev: `${ASSETS}prevb.png`,
+      next: `${ASSETS}nextb.png`,
+      enter: `${ASSETS}enterbb.png`,
+      iitm: `${ASSETS}iit.png`
+    };
+  
+    // Attempt to set the floor logo (if exists) otherwise fallback color
+    (function trySetLogo() {
+      const img = new Image();
+      img.onload = () => { floorLogo.setAttribute('src', ICONS.iitm); };
+      img.onerror = () => { floorLogo.setAttribute('material', 'color: #222; opacity: 0.6'); };
+      img.src = ICONS.iitm;
+    })();
+  
+    // Helper to safely set a button (image + click target)
+    function setButtonPlane(btnEl, iconPath, targetId) {
+      // remove old listeners to avoid duplicates
+      btnEl.onclick = null;
+      btnEl.removeEventListener('click', btnEl._listener);
+      btnEl.removeEventListener('touchstart', btnEl._listener);
+  
+      if (!targetId || targetId === '') {
+        btnEl.setAttribute('visible', 'false');
+        return;
+      }
+  
+      // try to load icon; if exists, use it; else use colored plane
+      const test = new Image();
+      test.onload = () => {
+        btnEl.setAttribute('src', iconPath);
+        btnEl.setAttribute('material', 'transparent:true;');
+        btnEl.setAttribute('visible','true');
+      };
+      test.onerror = () => {
+        btnEl.setAttribute('material', 'color:#37474f; opacity:0.95');
+        btnEl.setAttribute('visible','true');
+      };
+      test.src = iconPath;
+  
+      // click handler
+      const listener = (evt)=>{ evt && evt.stopPropagation(); gotoScene(targetId); };
+      btnEl._listener = listener;
+      btnEl.addEventListener('click', listener);
+      btnEl.addEventListener('touchstart', listener);
+    }
+  
+    // Rotate nav panel to always face camera, but keep floorLogo fixed
+    function orientPanelToCamera() {
+      if (!camera || !navPanel) return;
+      const camWorldPos = new THREE.Vector3();
+      camera.object3D.getWorldPosition(camWorldPos);
+      // navPanel look at camera horizontally only (preserve upright)
+      const panelObj = navPanel.object3D;
+      const panelPos = new THREE.Vector3();
+      panelObj.getWorldPosition(panelPos);
+      // compute look vector but zero out vertical difference so panel doesn't tilt up/down
+      const lookAt = camWorldPos.clone();
+      lookAt.y = panelPos.y; // keep same Y to avoid tilt
+      panelObj.lookAt(lookAt);
+    }
+  
+    // Load a panorama and update visible buttons per table
+    function loadScene(id) {
+      if (!id) return;
+      // fade transition
+      FADE.classList.add('on');
+      setTimeout(()=> {
+        sky.setAttribute('src', `${ASSETS}${id}.jpg`);
+        // configure buttons according to nav table (prev/next/enter)
+        const cfg = nav[id] || {prev:'', next:'', enter:''};
+        setButtonPlane(btnPrev, ICONS.prev, cfg.prev);
+        setButtonPlane(btnNext, ICONS.next, cfg.next);
+        setButtonPlane(btnEnter, ICONS.enter, cfg.enter);
+  
+        // center panel horizontally relative to available buttons:
+        // if only one button exists, center it; if two, arrange left & right; if three, prev-left enter-center next-right
+        const hasPrev = cfg.prev && cfg.prev !== '';
+        const hasNext = cfg.next && cfg.next !== '';
+        const hasEnter = cfg.enter && cfg.enter !== '';
+  
+        // positions
+        const leftX = -0.6, centerX = 0, rightX = 0.6;
+        // set visibility handled above; now place present buttons
+        if (hasPrev && !hasEnter && !hasNext) {
+          btnPrev.setAttribute('position', `${centerX} 0 0`);
+        } else if (!hasPrev && hasEnter && !hasNext) {
+          btnEnter.setAttribute('position', `${centerX} 0 0`);
+        } else if (!hasPrev && !hasEnter && hasNext) {
+          btnNext.setAttribute('position', `${centerX} 0 0`);
+        } else {
+          // default layout: prev-left, enter-center (if present), next-right
+          btnPrev.setAttribute('position', hasPrev ? `${hasEnter || hasNext ? leftX : centerX} 0 0` : `${leftX} 0 0`);
+          btnEnter.setAttribute('position', hasEnter ? `${centerX} 0 0` : `${centerX} 0 0`);
+          btnNext.setAttribute('position', hasNext ? `${hasEnter || hasPrev ? rightX : centerX} 0 0` : `${rightX} 0 0`);
+        }
+  
+        // ensure panel faces camera
+        setTimeout(()=> orientPanelToCamera(), 50);
+  
+        // preload neighbors (small optimization)
+        const cfgNeighbors = [];
+        if (cfg.prev) cfgNeighbors.push(cfg.prev);
+        if (cfg.next) cfgNeighbors.push(cfg.next);
+        if (cfg.enter) cfgNeighbors.push(cfg.enter);
+        cfgNeighbors.forEach(n => { const img = new Image(); img.src = `${ASSETS}${n}.jpg`; });
+  
+        FADE.classList.remove('on');
+      }, 220);
+    }
+  
+    // navigation wrapper
+    function gotoScene(target) {
+      if (!target) return;
+      loadScene(target);
+    }
+  
+    // always orient panel each frame to face camera horizontally
+    function tickOrient() {
+      orientPanelToCamera();
+      requestAnimationFrame(tickOrient);
+    }
+  
+    // preload all panoramas (best-effort)
+    function preloadAll() {
+      Object.keys(nav).forEach(k => {
+        const img = new Image();
+        img.src = `${ASSETS}${k}.jpg`;
+      });
+    }
+  
+    // init
+    window.addEventListener('DOMContentLoaded', () => {
+      preloadAll();
+      // try to set icons (if missing, setButtonPlane will fallback to colored plane)
+      // set initial scene
+      loadScene(START);
+      // start panel orientation loop
+      setTimeout(()=> tickOrient(), 120);
+    });
+  
+  })();
+  
+
+
+
+
+
+
+
+  then the html <code>
+
+
+  </code>
+
+
+
+
+
+
+
+
+
+  <!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>IITM MEMS Lab — Clean VR Controls</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <style>
+    html,body { margin:0; height:100%; background:#000; }
+    #fade { position:absolute; left:0; top:0; right:0; bottom:0; background:#000; pointer-events:none; opacity:0; transition:opacity .35s ease; z-index:9; }
+    #fade.on { opacity:1; pointer-events:auto; }
+  </style>
+</head>
+<body>
+  <div id="fade"></div>
+
+  <a-scene vr-mode-ui="enabled: true" embedded>
+
+    <!-- SKY / PANORAMA -->
+    <a-sky id="sky" radius="500" rotation="0 -90 0"></a-sky>
+
+    <!-- CAMERA + CURSOR (mouse + gaze) -->
+    <a-entity id="cameraRig">
+      <a-entity id="camera" camera look-controls position="0 1.6 0">
+        <a-entity id="cursor" cursor="fuse:false; rayOrigin:mouse"
+                  raycaster="objects: .clickable"
+                  position="0 0 -0.6"
+                  geometry="primitive: ring; radiusInner:0.02; radiusOuter:0.035"
+                  material="shader:flat; color:#fff">
+        </a-entity>
+      </a-entity>
+    </a-entity>
+
+    <!-- FLOOR LOGO (fixed bottom center) -->
+    <!-- rotation -90 makes it flat on floor; keep position world-fixed so it stays same in every panorama -->
+    <a-plane id="floorLogo"
+             position="0 0 0"
+             rotation="-90 0 0"
+             width="1.4" height="1.4"
+             material="transparent: true; opacity: 1"
+             src="">
+    </a-plane>
+
+    <!-- NAV PANEL (buttons sit above the logo) -->
+    <a-entity id="navPanel" position="0 0.22 -1.2">
+      <a-plane id="btnPrev" class="clickable" width="1.0" height="0.8"
+               position="-4 0 0" rotation="-90 0 0" material="transparent:true" visible="false"></a-plane>
+
+      <a-plane id="btnEnter" class="clickable" width="1.0" height="0.9"
+               position="0 0 0" rotation="-90 0 0" material="transparent:true" visible="false"></a-plane>
+
+      <a-plane id="btnNext" class="clickable" width="1.0" height="0.8"
+               position="4 0 0" rotation="-90 0 0" material="transparent:true" visible="false"></a-plane>
+    </a-entity>
+
+    <a-entity light="type: ambient; intensity: 0.9"></a-entity>
+
+  </a-scene>
+
+  <script src="tour.js"></script>
+</body>
+</html>
