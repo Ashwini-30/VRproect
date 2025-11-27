@@ -1,105 +1,85 @@
 <!doctype html>
 <html lang="en">
 <head>
- <meta charset="utf-8" />
- <title>IITM MEMS Lab — Clean VR Controls</title>
- <meta name="viewport" content="width=device-width, initial-scale=1" />
- <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+<meta charset="utf-8" />
+<title>IITM MEMS Lab VR</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 
- <style>
-   html,body{margin:0;height:100%;background:#000;font-family:Poppins,"Segoe UI",system-ui,sans-serif;}
-   #fade{position:absolute;left:0;top:0;right:0;bottom:0;background:#000;pointer-events:none;opacity:0;
-         transition:opacity .35s ease;z-index:9;}
-   #fade.on{opacity:1;pointer-events:auto;}
+<style>
+html,body{margin:0;height:100%;background:#000;font-family:Poppins;}
+#fade{position:absolute;inset:0;background:#000;opacity:0;transition:.4s;z-index:9}
+#fade.on{opacity:1}
 
-   /* AUDIO UI TOP RIGHT */
-   #audioUI{position:fixed;top:16px;right:16px;display:flex;gap:12px;z-index:50;}
-   .audioBtn{width:72px;height:72px;border-radius:18px;background:rgba(0,0,0,0.7);
-             border:2px solid #00eaff;backdrop-filter:blur(10px);
-             box-shadow:0 0 18px rgba(0,238,255,0.75);cursor:pointer;
-             display:flex;align-items:center;justify-content:center;}
-   .audioBtn img{width:75%;height:75%;object-fit:contain;}
+/* TOP RIGHT AUDIO UI */
+#audioUI{position:fixed;top:15px;right:15px;display:flex;gap:14px;z-index:999}
+.audioBtn{width:70px;height:70px;border-radius:16px;border:2px solid #00eaff;background:#0009;
+          display:flex;align-items:center;justify-content:center;cursor:pointer}
+.audioBtn img{width:75%}
 
-   #subtitles{position:fixed;left:50%;bottom:58px;transform:translateX(-50%);padding:10px 18px;
-              max-width:72%;border-radius:12px;background:rgba(0,0,0,0.75);
-              border:1px solid rgba(0,238,255,0.8);color:#fff;font-size:16px;text-align:center;z-index:40;display:none;}
-   #progressWrap{position:fixed;left:50%;bottom:32px;transform:translateX(-50%);
-                 width:60%;height:6px;border-radius:999px;background:rgba(255,255,255,0.18);
-                 overflow:hidden;z-index:40;display:none;}
-   #progressBar{width:0%;height:100%;background:#00eaff;border-radius:999px;}
+/* PPE UI LEFT */
+#ppeUI{position:fixed;top:90px;left:15px;z-index:999}
+#ppePanel{width:260px;padding:10px;background:#000d;border:1px solid #ffb100;display:none;color:#fff}
 
-   /* PPE UI LEFT */
-   #ppeUI{position:fixed;top:90px;left:16px;z-index:50;display:flex;flex-direction:column;gap:8px;}
-   #ppeToggle{padding:8px 14px;border-radius:10px;border:1px solid #ffb300;background:rgba(0,0,0,0.7);
-              color:#ffd770;font-size:14px;cursor:pointer;
-              box-shadow:0 0 14px rgba(255,183,0,0.7);}
-   #ppePanel{width:260px;padding:10px;border-radius:14px;background:rgba(0,0,0,0.85);
-             border:1px solid rgba(255,183,0,0.9);box-shadow:0 0 22px rgba(255,183,0,0.85);
-             display:none;flex-direction:column;color:#fff;font-size:13px;}
-   #ppeGrid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:4px;}
-   .ppe-item{width:50px;height:50px;border-radius:10px;background:#111;border:2px solid transparent;
-            display:flex;align-items:center;justify-content:center;cursor:pointer;}
-   .ppe-item.selected{opacity:0.3;border-color:#00eaff;}
-
- </style>
+/* VR INTERACTABLE PLANES (invisible) */
+.vrTouch{opacity:0.001}
+</style>
 </head>
+
 <body>
 
 <div id="fade"></div>
 
-<!-- AUDIO -->
+<!-- ============== 2D UI (unchanged) ============== -->
 <div id="audioUI">
- <button id="btnAudioPlay" class="audioBtn"><img src="Images/start.png"></button>
- <button id="btnAudioStop" class="audioBtn"><img src="Images/stop.png"></button>
- <button id="btnAudioReplay" class="audioBtn"><img src="Images/replay.png"></button>
+  <button id="btnAudioPlay" class="audioBtn"><img src="Images/start.png"></button>
+  <button id="btnAudioStop" class="audioBtn"><img src="Images/stop.png"></button>
+  <button id="btnAudioReplay" class="audioBtn"><img src="Images/replay.png"></button>
 </div>
 
-<div id="subtitles"></div>
-<div id="progressWrap"><div id="progressBar"></div></div>
-
-<!-- PPE -->
 <div id="ppeUI">
- <button id="ppeToggle">Cleanroom PPE Test</button>
-
- <div id="ppePanel">
-   <b>Gowning Sequence</b>
-   <div id="ppeMsg">Press PPE test to begin.</div>
-
-   <div id="ppeGrid">
-     <div class="ppe-item" data-id="ppe1"><img src="Images/ppe_labcoat.png"></div>
-     <div class="ppe-item" data-id="ppe2"><img src="Images/ppe_shoe.png"></div>
-     <div class="ppe-item" data-id="ppe3"><img src="Images/ppe_hairnet.png"></div>
-     <div class="ppe-item" data-id="ppe4"><img src="Images/ppe_mask.png"></div>
-     <div class="ppe-item" data-id="ppe5"><img src="Images/ppe_goggle.png"></div>
-     <div class="ppe-item" data-id="ppe6"><img src="Images/ppe_gown.png"></div>
-     <div class="ppe-item" data-id="ppe7"><img src="Images/ppe_shoecover.png"></div>
-     <div class="ppe-item" data-id="ppe8"><img src="Images/ppe_boot.png"></div>
-     <div class="ppe-item" data-id="ppe9"><img src="Images/ppe_purpleglove.png"></div>
-     <div class="ppe-item" data-id="ppe10"><img src="Images/ppe_glove_blue.png"></div>
-   </div>
-
-   <button id="ppeClose">Close</button>
- </div>
+<button id="ppeToggle">Cleanroom PPE Test</button>
+<div id="ppePanel">
+  <div id="ppeMsg">Tap to start</div>
+  <div id="ppeGrid">
+    <div class="ppe-item" data-id="ppe1"><img src="Images/ppe_labcoat.png"/></div>
+    <div class="ppe-item" data-id="ppe2"><img src="Images/ppe_shoe.png"/></div>
+    <div class="ppe-item" data-id="ppe3"><img src="Images/ppe_hairnet.png"/></div>
+    <div class="ppe-item" data-id="ppe4"><img src="Images/ppe_mask.png"/></div>
+    <div class="ppe-item" data-id="ppe5"><img src="Images/ppe_goggle.png"/></div>
+    <div class="ppe-item" data-id="ppe6"><img src="Images/ppe_gown.png"/></div>
+    <div class="ppe-item" data-id="ppe7"><img src="Images/ppe_shoecover.png"/></div>
+    <div class="ppe-item" data-id="ppe8"><img src="Images/ppe_boot.png"/></div>
+    <div class="ppe-item" data-id="ppe9"><img src="Images/ppe_purpleglove.png"/></div>
+    <div class="ppe-item" data-id="ppe10"><img src="Images/ppe_glove_blue.png"/></div>
+  </div>
+  <button id="ppeClose">Close</button>
+</div>
 </div>
 
-<!-- SCENE -->
-<a-scene embedded vr-mode-ui="enabled: true">
 
- <a-sky id="sky" radius="500" rotation="0 -90 0"></a-sky>
+<!-- ================= VR VIEW ================= -->
+<a-scene renderer="foveationLevel:1; antialias:true" vr-mode-ui="enabled:true">
 
- <a-entity id="cameraRig">
-  <a-entity id="camera" camera look-controls position="0 1.6 0"></a-entity>
- </a-entity>
+  <a-sky id="sky" radius="500" rotation="0 -90 0"></a-sky>
 
- <!-- VR CLICK PLANES = allow Quest controller interaction -->
- <a-entity id="vr-ui" position="0 1.4 -1.1" vr-screen-click>
-   <a-plane id="vr-play"   class="clickable" width="0.35" height="0.25" color="blue" opacity="0.001" position="-0.8 0.45 0"></a-plane>
-   <a-plane id="vr-stop"   class="clickable" width="0.35" height="0.25" color="red" opacity="0.001"  position="-0.2 0.45 0"></a-plane>
-   <a-plane id="vr-replay" class="clickable" width="0.35" height="0.25" color="green" opacity="0.001" position="0.4 0.45 0"></a-plane>
+  <a-entity id="cameraRig">
+      <a-entity id="camera" camera look-controls wasd-controls position="0 1.6 0"></a-entity>
+  </a-entity>
 
-   <a-plane id="vr-ppe"       class="clickable" width="0.6" height="0.3" opacity="0.001" position="-0.9 -0.25 0"></a-plane>
-   <a-plane id="vr-ppe-close" class="clickable" width="0.55" height="0.25" opacity="0.001" position="0.9 -0.25 0"></a-plane>
- </a-entity>
+  <!-- ***** INVISIBLE VR CLICKERS (Mapping HTML Buttons) ***** -->
+  <a-plane id="vrPlay"   class="vrTouch clickable"  position="0 -0.6 -1.2" width="0.3" height="0.2"></a-plane>
+  <a-plane id="vrStop"   class="vrTouch clickable"  position="0 -0.3 -1.2" width="0.3" height="0.2"></a-plane>
+  <a-plane id="vrReplay" class="vrTouch clickable"  position="0 0.0  -1.2" width="0.3" height="0.2"></a-plane>
+  <a-plane id="vrPPE"    class="vrTouch clickable"  position="-0.8 0.3 -1.2" width="0.4" height="0.3"></a-plane>
+  <a-plane id="vrPPEclose"class="vrTouch clickable" position="0.8 0.3  -1.2" width="0.4" height="0.3"></a-plane>
+
+  <!-- PREV-ENTER-NEXT — same location always in front -->
+  <a-entity id="navVR" position="0 -0.2 -1.4">
+      <a-plane id="vrPrev"  class="vrTouch clickable" position="-0.6 0 0" width="0.35" height="0.25"></a-plane>
+      <a-plane id="vrEnter" class="vrTouch clickable" position="0    0 0" width="0.35" height="0.25"></a-plane>
+      <a-plane id="vrNext"  class="vrTouch clickable" position="0.6  0 0" width="0.35" height="0.25"></a-plane>
+  </a-entity>
 
 </a-scene>
 
