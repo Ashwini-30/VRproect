@@ -1,4 +1,4 @@
-/* Clean controls: floor logo + image buttons (prev/enter/next) + VR CONTROLLERS
+/* Clean controls: floor logo + image buttons (prev/enter/next)
   360 images: Images/<scene>.jpg
   Nav icons: Images/prevb.png, Images/nextb.png, Images/enterbb.png, Images/iit.png
   Scene audio: Audio/<scene>.mp3
@@ -228,7 +228,7 @@
 
  function resetPPEGame() {
    ppeStep = 0;
-   ppeMsg.textContent = "Tap "Cleanroom PPE Test" to begin.";
+   ppeMsg.textContent = "Tap “Cleanroom PPE Test” to begin.";
    ppePanel.style.display = 'none';
    if (ppeAudio) {
      ppeAudio.pause();
@@ -303,35 +303,7 @@
 
  /* ==================== NAVIGATION & UI ==================== */
 
- // VR CONTROLLER SUPPORT - Handle controller raycaster events
- function setupVRControllers() {
-   const leftController = document.getElementById('left-controller');
-   const rightController = document.getElementById('right-controller');
-   
-   [leftController, rightController].forEach(controller => {
-     if (!controller) return;
-     
-     // Trigger events on controller button press
-     controller.addEventListener('raycaster-intersection', (evt) => {
-       const intersects = evt.detail.els;
-       const target = intersects[0];
-       if (target && target.classList.contains('clickable')) {
-         target.emit('click');
-       }
-     });
-     
-     // Handle controller trigger/button press
-     controller.addEventListener('triggerdown', (evt) => {
-       const intersects = controller.components.raycaster.intersections || [];
-       const target = intersects[0]?.el;
-       if (target && target.classList.contains('clickable')) {
-         target.emit('click');
-       }
-     });
-   });
- }
-
- // Helper to safely set a nav button (keeps your original structure + VR support)
+ // Helper to safely set a nav button (keeps your original structure)
  function setButtonPlane(btnEl, iconPath, targetId) {
    // remove old listeners
    btnEl.onclick = null;
@@ -407,7 +379,7 @@
        btnNext.setAttribute('position', `${centerX} 0 0`);
      } else {
        btnPrev.setAttribute('position',
-         hasPrev ? `${(hasEnter || hasNext) ? leftX : centerX} 0 0` : `${leftX} 0 0`);
+         hasPrev ? `${(hasEnter or hasNext) ? leftX : centerX} 0 0` : `${leftX} 0 0`);
        btnEnter.setAttribute('position', `${centerX} 0 0`);
        btnNext.setAttribute('position',
          hasNext ? `${(hasEnter || hasPrev) ? rightX : centerX} 0 0` : `${rightX} 0 0`);
@@ -454,10 +426,7 @@
  window.addEventListener('DOMContentLoaded', () => {
    preloadAll();
    loadScene(START);
-   setTimeout(() => {
-     tickOrient();
-     setupVRControllers(); // ADD VR CONTROLLER SUPPORT
-   }, 120);
+   setTimeout(() => tickOrient(), 120);
  });
 
 })();
