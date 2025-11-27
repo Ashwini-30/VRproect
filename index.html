@@ -1,112 +1,108 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<title>IITM MEMS Lab — Clean VR Controls</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+ <meta charset="utf-8" />
+ <title>IITM MEMS Lab — Clean VR Controls</title>
+ <meta name="viewport" content="width=device-width, initial-scale=1" />
+ <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 
-<style>
-html,body{margin:0;height:100%;background:#000;font-family:Poppins,"Segoe UI",system-ui,sans-serif;}
-#fade{position:absolute;left:0;top:0;right:0;bottom:0;background:#000;pointer-events:none;opacity:0;transition:.35s;z-index:9;}
-#fade.on{opacity:1;pointer-events:auto;}
+ <style>
+   html,body{margin:0;height:100%;background:#000;font-family:Poppins,"Segoe UI",system-ui,sans-serif;}
+   #fade{position:absolute;left:0;top:0;right:0;bottom:0;background:#000;pointer-events:none;opacity:0;
+         transition:opacity .35s ease;z-index:9;}
+   #fade.on{opacity:1;pointer-events:auto;}
 
-/* AUDIO BUTTON TOP RIGHT */
-#audioUI{position:fixed;top:16px;right:16px;display:flex;gap:12px;z-index:999;}
-.audioBtn{width:82px;height:82px;border-radius:18px;background:rgba(0,0,0,.75);border:2px solid #00eaff;
-backdrop-filter:blur(10px);box-shadow:0 0 18px rgba(0,238,255,.65);cursor:pointer;display:flex;align-items:center;
-justify-content:center;transition:.2s;}
-.audioBtn img{width:80%;height:80%;}
-.audioBtn:hover{transform:scale(1.15);box-shadow:0 0 25px cyan;}
+   /* AUDIO UI TOP RIGHT */
+   #audioUI{position:fixed;top:16px;right:16px;display:flex;gap:12px;z-index:50;}
+   .audioBtn{width:72px;height:72px;border-radius:18px;background:rgba(0,0,0,0.7);
+             border:2px solid #00eaff;backdrop-filter:blur(10px);
+             box-shadow:0 0 18px rgba(0,238,255,0.75);cursor:pointer;
+             display:flex;align-items:center;justify-content:center;}
+   .audioBtn img{width:75%;height:75%;object-fit:contain;}
 
-/* SUBTITLES */
-#subtitles{position:fixed;left:50%;bottom:72px;transform:translateX(-50%);padding:12px 20px;max-width:75%;
-border-radius:12px;background:rgba(0,0,0,.78);border:1px solid cyan;color:#fff;font-size:18px;text-align:center;z-index:999;display:none;}
-#progressWrap{position:fixed;left:50%;bottom:48px;transform:translateX(-50%);width:65%;height:7px;border-radius:999px;
-background:rgba(255,255,255,.18);overflow:hidden;z-index:999;display:none;}
-#progressBar{width:0%;height:100%;background:#00eaff;border-radius:999px;}
+   #subtitles{position:fixed;left:50%;bottom:58px;transform:translateX(-50%);padding:10px 18px;
+              max-width:72%;border-radius:12px;background:rgba(0,0,0,0.75);
+              border:1px solid rgba(0,238,255,0.8);color:#fff;font-size:16px;text-align:center;z-index:40;display:none;}
+   #progressWrap{position:fixed;left:50%;bottom:32px;transform:translateX(-50%);
+                 width:60%;height:6px;border-radius:999px;background:rgba(255,255,255,0.18);
+                 overflow:hidden;z-index:40;display:none;}
+   #progressBar{width:0%;height:100%;background:#00eaff;border-radius:999px;}
 
-/* PPE GAME TOP LEFT */
-#ppeUI{position:fixed;top:96px;left:16px;z-index:999;display:flex;flex-direction:column;gap:10px;}
-#ppeToggle{padding:10px 16px;border-radius:10px;border:2px solid #ffb300;background:rgba(0,0,0,.75);
-color:#ffd770;font-size:15px;cursor:pointer;box-shadow:0 0 14px gold;white-space:nowrap;}
-#ppeToggle:hover{transform:scale(1.05);box-shadow:0 0 24px gold;}
+   /* PPE UI LEFT */
+   #ppeUI{position:fixed;top:90px;left:16px;z-index:50;display:flex;flex-direction:column;gap:8px;}
+   #ppeToggle{padding:8px 14px;border-radius:10px;border:1px solid #ffb300;background:rgba(0,0,0,0.7);
+              color:#ffd770;font-size:14px;cursor:pointer;
+              box-shadow:0 0 14px rgba(255,183,0,0.7);}
+   #ppePanel{width:260px;padding:10px;border-radius:14px;background:rgba(0,0,0,0.85);
+             border:1px solid rgba(255,183,0,0.9);box-shadow:0 0 22px rgba(255,183,0,0.85);
+             display:none;flex-direction:column;color:#fff;font-size:13px;}
+   #ppeGrid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:4px;}
+   .ppe-item{width:50px;height:50px;border-radius:10px;background:#111;border:2px solid transparent;
+            display:flex;align-items:center;justify-content:center;cursor:pointer;}
+   .ppe-item.selected{opacity:0.3;border-color:#00eaff;}
 
-#ppePanel{width:270px;padding:12px;border-radius:14px;background:rgba(0,0,0,.88);border:2px solid gold;color:white;
-display:none;flex-direction:column;gap:8px;}
-#ppeHeader{font-weight:bold;color:#ffd770;font-size:16px;}
-#ppeMsg{min-height:38px;}
-
-#ppeGrid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:6px;}
-.ppe-item{width:54px;height:54px;border-radius:10px;background:rgba(255,255,255,.07);border:2px solid transparent;
-display:flex;justify-content:center;align-items:center;cursor:pointer;}
-.ppe-item img{width:90%;}
-.ppe-item.selected{opacity:0.3;border-color:#00eaff;}
-#ppeFooter{display:flex;justify-content:space-between;margin-top:6px;}
-#ppeClose{padding:6px 10px;border-radius:10px;background:#330000;color:#ff9999;border:1px solid red;cursor:pointer;}
-#ppeSceneType{font-size:12px;opacity:.9;}
-</style>
+ </style>
 </head>
-
 <body>
+
 <div id="fade"></div>
 
-<!-- AUDIO BUTTON UI -->
+<!-- AUDIO -->
 <div id="audioUI">
  <button id="btnAudioPlay" class="audioBtn"><img src="Images/start.png"></button>
  <button id="btnAudioStop" class="audioBtn"><img src="Images/stop.png"></button>
  <button id="btnAudioReplay" class="audioBtn"><img src="Images/replay.png"></button>
 </div>
 
-<!-- SUBTITLES + PROGRESS -->
 <div id="subtitles"></div>
 <div id="progressWrap"><div id="progressBar"></div></div>
 
-<!-- PPE GAME -->
+<!-- PPE -->
 <div id="ppeUI">
-<button id="ppeToggle">Cleanroom PPE Test</button>
-<div id="ppePanel">
- <div id="ppeHeader">Gowning Sequence Practice</div>
- <div id="ppeMsg">Tap start to begin.</div>
- <div id="ppeGrid">
-  <div class="ppe-item" data-id="ppe1"><img src="Images/ppe_labcoat.png"></div>
-  <div class="ppe-item" data-id="ppe2"><img src="Images/ppe_shoe.png"></div>
-  <div class="ppe-item" data-id="ppe3"><img src="Images/ppe_hairnet.png"></div>
-  <div class="ppe-item" data-id="ppe4"><img src="Images/ppe_mask.png"></div>
-  <div class="ppe-item" data-id="ppe5"><img src="Images/ppe_goggle.png"></div>
-  <div class="ppe-item" data-id="ppe6"><img src="Images/ppe_gown.png"></div>
-  <div class="ppe-item" data-id="ppe7"><img src="Images/ppe_shoecover.png"></div>
-  <div class="ppe-item" data-id="ppe8"><img src="Images/ppe_boot.png"></div>
-  <div class="ppe-item" data-id="ppe9"><img src="Images/ppe_purpleglove.png"></div>
-  <div class="ppe-item" data-id="ppe10"><img src="Images/ppe_glove_blue.png"></div>
+ <button id="ppeToggle">Cleanroom PPE Test</button>
+
+ <div id="ppePanel">
+   <b>Gowning Sequence</b>
+   <div id="ppeMsg">Press PPE test to begin.</div>
+
+   <div id="ppeGrid">
+     <div class="ppe-item" data-id="ppe1"><img src="Images/ppe_labcoat.png"></div>
+     <div class="ppe-item" data-id="ppe2"><img src="Images/ppe_shoe.png"></div>
+     <div class="ppe-item" data-id="ppe3"><img src="Images/ppe_hairnet.png"></div>
+     <div class="ppe-item" data-id="ppe4"><img src="Images/ppe_mask.png"></div>
+     <div class="ppe-item" data-id="ppe5"><img src="Images/ppe_goggle.png"></div>
+     <div class="ppe-item" data-id="ppe6"><img src="Images/ppe_gown.png"></div>
+     <div class="ppe-item" data-id="ppe7"><img src="Images/ppe_shoecover.png"></div>
+     <div class="ppe-item" data-id="ppe8"><img src="Images/ppe_boot.png"></div>
+     <div class="ppe-item" data-id="ppe9"><img src="Images/ppe_purpleglove.png"></div>
+     <div class="ppe-item" data-id="ppe10"><img src="Images/ppe_glove_blue.png"></div>
+   </div>
+
+   <button id="ppeClose">Close</button>
  </div>
- <div id="ppeFooter"><span id="ppeSceneType"></span><button id="ppeClose">Close</button></div>
-</div>
 </div>
 
-<!-- ================= VR SCENE ================= -->
-<a-scene vr-mode-ui="enabled:true" renderer="antialias:true">
+<!-- SCENE -->
+<a-scene embedded vr-mode-ui="enabled: true">
 
-<a-sky id="sky" rotation="0 -90 0"></a-sky>
+ <a-sky id="sky" radius="500" rotation="0 -90 0"></a-sky>
 
-<a-entity id="cameraRig" movement-controls>
- <a-entity id="camera" camera look-controls position="0 1.6 0">
-  <a-cursor raycaster="objects:.vr-interact"></a-cursor>
+ <a-entity id="cameraRig">
+  <a-entity id="camera" camera look-controls position="0 1.6 0"></a-entity>
  </a-entity>
-</a-entity>
 
-<!-- VR CONTROLLER LASERS -->
-<a-entity laser-controls="hand:right" raycaster="objects:.vr-interact"></a-entity>
-<a-entity laser-controls="hand:left"  raycaster="objects:.vr-interact"></a-entity>
+ <!-- VR CLICK PLANES = allow Quest controller interaction -->
+ <a-entity id="vr-ui" position="0 1.4 -1.1" vr-screen-click>
+   <a-plane id="vr-play"   class="clickable" width="0.35" height="0.25" color="blue" opacity="0.001" position="-0.8 0.45 0"></a-plane>
+   <a-plane id="vr-stop"   class="clickable" width="0.35" height="0.25" color="red" opacity="0.001"  position="-0.2 0.45 0"></a-plane>
+   <a-plane id="vr-replay" class="clickable" width="0.35" height="0.25" color="green" opacity="0.001" position="0.4 0.45 0"></a-plane>
 
-<!-- VR UI BUTTONS -->
-<a-entity id="vrUI" position="0 1.45 -1.4">
- <a-plane class="vr-interact" vr-click-proxy="target:#btnPrev"  color="#222" width="0.45" height="0.25" text="value:Prev;"></a-plane>
- <a-plane class="vr-interact" vr-click-proxy="target:#btnEnter" color="#222" width="0.45" height="0.25" text="value:Enter;" position="0.6 0 0"></a-plane>
- <a-plane class="vr-interact" vr-click-proxy="target:#btnNext"  color="#222" width="0.45" height="0.25" text="value:Next;" position="1.2 0 0"></a-plane>
-</a-entity>
+   <a-plane id="vr-ppe"       class="clickable" width="0.6" height="0.3" opacity="0.001" position="-0.9 -0.25 0"></a-plane>
+   <a-plane id="vr-ppe-close" class="clickable" width="0.55" height="0.25" opacity="0.001" position="0.9 -0.25 0"></a-plane>
+ </a-entity>
+
+</a-scene>
 
 <script src="tour.js"></script>
-</a-scene>
 </body>
 </html>
