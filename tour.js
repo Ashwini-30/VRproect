@@ -1,8 +1,8 @@
 /* Clean controls: floor logo + image buttons (prev/enter/next)
-   360 images: Images/<scene>.jpg
-   Nav icons: Images/prevb.png, Images/nextb.png, Images/enterbb.png, Images/iit.png
-   Scene audio: Audio/<scene>.mp3
-   PPE audio:  Audio/cl.mp3 (litho + char), Audio/others.mp3 (all other rooms)
+  360 images: Images/<scene>.jpg
+  Nav icons: Images/prevb.png, Images/nextb.png, Images/enterbb.png, Images/iit.png
+  Scene audio: Audio/<scene>.mp3
+  PPE audio:  Audio/cl.mp3 (litho + char), Audio/others.mp3 (all other rooms)
 */
 
 (() => {
@@ -20,7 +20,7 @@
   const btnEnter  = document.getElementById('btnEnter');
   const camera    = document.getElementById('camera');
 
-  // Audio UI
+  // Audio UI (desktop)
   const subBox         = document.getElementById('subtitles');
   const progWrap       = document.getElementById('progressWrap');
   const progBar        = document.getElementById('progressBar');
@@ -28,13 +28,25 @@
   const btnAudioStop   = document.getElementById('btnAudioStop');
   const btnAudioReplay = document.getElementById('btnAudioReplay');
 
-  // PPE UI
+  // Audio UI (VR)
+  const vrBtnAudioPlay   = document.getElementById('vrBtnAudioPlay');
+  const vrBtnAudioStop   = document.getElementById('vrBtnAudioStop');
+  const vrBtnAudioReplay = document.getElementById('vrBtnAudioReplay');
+  const vrSubBg          = document.getElementById('vrSubBg');
+  const vrSubText        = document.getElementById('vrSubText');
+
+  // PPE UI (desktop)
   const ppeToggle    = document.getElementById('ppeToggle');
   const ppePanel     = document.getElementById('ppePanel');
   const ppeMsg       = document.getElementById('ppeMsg');
   const ppeSceneType = document.getElementById('ppeSceneType');
   const ppeClose     = document.getElementById('ppeClose');
-  const ppeItems     = document.querySelectorAll('.ppe-item');
+  const ppeItems     = document.querySelectorAll('.ppe-item'); // includes VR items also
+
+  // PPE UI (VR)
+  const vrPpeToggle  = document.getElementById('vrPpeToggle');
+  const vrPpePanel   = document.getElementById('vrPpePanel');
+  const vrPpeMsg     = document.getElementById('vrPpeMsg');
 
   let currentAudio    = null;   // scene narration
   let currentSceneId  = null;
@@ -44,7 +56,7 @@
   let currentPpeOrder = [];
   let ppeStep         = 0;
 
-  // Navigation table (your exact mapping)
+  // Navigation table (your mapping)
   const nav = {
     mainentry:{prev:"",    next:"cn1",  enter:"cn1"},
     c1:{prev:"c2",         next:"entry",enter:"c2"},
@@ -122,14 +134,31 @@
 
   /* ==================== AUDIO + SUBTITLES ==================== */
 
+  function hideSubtitles() {
+    progWrap.style.display = 'none';
+    subBox.style.display   = 'none';
+    progBar.style.width    = '0%';
+
+    if (vrSubBg && vrSubText) {
+      vrSubBg.setAttribute('visible', false);
+      vrSubText.setAttribute('visible', false);
+      vrSubText.setAttribute('value', '');
+    }
+  }
+
   function stopCurrentAudio() {
     if (currentAudio) {
       currentAudio.pause();
       currentAudio.currentTime = 0;
     }
-    progWrap.style.display = 'none';
-    subBox.style.display   = 'none';
-    progBar.style.width    = '0%';
+    hideSubtitles();
+  }
+
+  function updateVrSubtitle(text) {
+    if (!vrSubBg || !vrSubText) return;
+    vrSubBg.setAttribute('visible', true);
+    vrSubText.setAttribute('visible', true);
+    vrSubText.setAttribute('value', text);
   }
 
   function playSceneAudio(sceneId) {
@@ -146,6 +175,7 @@
     subBox.style.display   = 'block';
     progWrap.style.display = 'block';
     subBox.textContent     = lines[0];
+    updateVrSubtitle(lines[0]);
 
     audio.addEventListener('timeupdate', () => {
       if (!audio.duration || isNaN(audio.duration)) return;
@@ -155,12 +185,15 @@
 
     audio.addEventListener('ended', () => {
       progBar.style.width = '100%';
+      let text;
       if (lines.length > 1 && lineIdx < lines.length - 1) {
         lineIdx = lines.length - 1;
-        subBox.textContent = lines[lineIdx];
+        text = lines[lineIdx];
       } else {
-        subBox.textContent = `${sceneLabel(sceneId)} narration completed. You can continue exploring.`;
+        text = `${sceneLabel(sceneId)} narration completed. You can continue exploring.`;
       }
+      subBox.textContent = text;
+      updateVrSubtitle(text);
     });
 
     if (lines.length > 1) {
@@ -170,7 +203,9 @@
         const newIdx = Math.floor(audio.currentTime / (chunk || 1));
         if (newIdx !== lineIdx && newIdx < lines.length) {
           lineIdx = newIdx;
-          subBox.textContent = lines[lineIdx];
+          const txt = lines[lineIdx];
+          subBox.textContent = txt;
+          updateVrSubtitle(txt);
         }
       }, 500);
       audio.addEventListener('ended', () => clearInterval(interval));
@@ -178,29 +213,35 @@
 
     audio.play().catch(() => {
       // autoplay blocked
-      subBox.textContent = lines[0];
+      const txt = lines[0];
+      subBox.textContent = txt;
       progBar.style.width = '0%';
+      updateVrSubtitle(txt);
     });
   }
 
-  if (btnAudioPlay) {
-    btnAudioPlay.addEventListener('click', () => {
-      if (!currentSceneId) return;
-      if (currentAudio) currentAudio.play();
-      else playSceneAudio(currentSceneId);
-    });
+  function onAudioPlay() {
+    if (!currentSceneId) return;
+    if (currentAudio) currentAudio.play().catch(()=>{});
+    else playSceneAudio(currentSceneId);
   }
-  if (btnAudioStop) {
-    btnAudioStop.addEventListener('click', () => {
-      stopCurrentAudio();
-    });
+  function onAudioStop() {
+    stopCurrentAudio();
   }
-  if (btnAudioReplay) {
-    btnAudioReplay.addEventListener('click', () => {
-      if (!currentSceneId) return;
-      playSceneAudio(currentSceneId);
-    });
+  function onAudioReplay() {
+    if (!currentSceneId) return;
+    playSceneAudio(currentSceneId);
   }
+
+  // Desktop buttons
+  if (btnAudioPlay)   btnAudioPlay.addEventListener('click', onAudioPlay);
+  if (btnAudioStop)   btnAudioStop.addEventListener('click', onAudioStop);
+  if (btnAudioReplay) btnAudioReplay.addEventListener('click', onAudioReplay);
+
+  // VR HUD buttons (same actions)
+  if (vrBtnAudioPlay)   vrBtnAudioPlay.addEventListener('click', onAudioPlay);
+  if (vrBtnAudioStop)   vrBtnAudioStop.addEventListener('click', onAudioStop);
+  if (vrBtnAudioReplay) vrBtnAudioReplay.addEventListener('click', onAudioReplay);
 
   /* ==================== PPE GAME LOGIC ==================== */
 
@@ -226,48 +267,108 @@
     return ["ppe1","ppe7","ppe2","ppe10","ppe9","ppe3","ppe4","ppe5"];
   }
 
+  function setPpeElementSelected(el, selected) {
+    if (!el) return;
+    if (selected) {
+      el.classList.add('selected');
+      if (el.tagName && el.tagName.toLowerCase().startsWith('a-')) {
+        el.setAttribute('material', 'opacity:0.3');
+      } else {
+        el.style.opacity = '0.3';
+      }
+    } else {
+      el.classList.remove('selected');
+      if (el.tagName && el.tagName.toLowerCase().startsWith('a-')) {
+        el.setAttribute('material', 'opacity:1');
+      } else {
+        el.style.opacity = '1';
+      }
+    }
+  }
+
   function resetPPEGame() {
     ppeStep = 0;
-    ppeMsg.textContent = "Tap “Cleanroom PPE Test” to begin.";
-    ppePanel.style.display = 'none';
+    if (ppeMsg) ppeMsg.textContent = "Tap “Cleanroom PPE Test” to begin.";
+    if (vrPpeMsg) vrPpeMsg.setAttribute('value', "Tap “Cleanroom PPE Test” to begin.");
+    if (ppePanel) ppePanel.style.display = 'none';
+    if (vrPpePanel) vrPpePanel.setAttribute('visible', false);
+
     if (ppeAudio) {
       ppeAudio.pause();
       ppeAudio.currentTime = 0;
     }
-    ppeItems.forEach(el => {
-      el.classList.remove('selected');
-      el.style.opacity = '1';
-    });
+
+    ppeItems.forEach(el => setPpeElementSelected(el, false));
   }
 
   function updatePPEForScene(id) {
     const label = sceneLabel(id);
-    ppeSceneType.textContent = label;
+    if (ppeSceneType) ppeSceneType.textContent = label;
     currentPpeOrder = getPPEOrderForScene(id);
     ppeAudioFile = isLithOrChar(id) ? 'cl.mp3' : 'others.mp3';
     resetPPEGame();
+  }
+
+  function handlePpeClick(id) {
+    if (!currentPpeOrder || !currentPpeOrder.length) return;
+    if (ppePanel && ppePanel.style.display === 'none' && (!vrPpePanel || !vrPpePanel.getAttribute('visible'))) return;
+
+    const expected = currentPpeOrder[ppeStep];
+    if (id === expected) {
+      // select that id in both HTML and VR
+      document.querySelectorAll(`.ppe-item[data-id="${id}"]`).forEach(el => {
+        setPpeElementSelected(el, true);
+      });
+      ppeStep++;
+
+      if (ppeStep === currentPpeOrder.length) {
+        if (ppeMsg) ppeMsg.textContent = "✅ Gowning sequence completed correctly. You are cleanroom ready!";
+        if (vrPpeMsg) vrPpeMsg.setAttribute('value', "✅ Gowning sequence completed correctly. You are cleanroom ready!");
+      } else {
+        const txt = `✔ Correct. Select step ${ppeStep + 1} next.`;
+        if (ppeMsg) ppeMsg.textContent = txt;
+        if (vrPpeMsg) vrPpeMsg.setAttribute('value', txt);
+      }
+    } else {
+      const txt = "❌ Incorrect item. Re-check the gowning order and try again.";
+      if (ppeMsg) ppeMsg.textContent = txt;
+      if (vrPpeMsg) vrPpeMsg.setAttribute('value', txt);
+    }
   }
 
   if (ppeToggle) {
     ppeToggle.addEventListener('click', () => {
       if (!currentSceneId) return;
       resetPPEGame();
-      // stop scene narration when PPE instructions play
       stopCurrentAudio();
 
-      ppeMsg.textContent = "Playing gowning instruction audio...";
+      if (ppeMsg) ppeMsg.textContent = "Playing gowning instruction audio...";
+      if (vrPpeMsg) vrPpeMsg.setAttribute('value', "Playing gowning instruction audio...");
+
       ppeAudio = new Audio(`${AUDIO}${ppeAudioFile}`);
 
       ppeAudio.onended = () => {
-        ppePanel.style.display = 'flex';
-        ppeMsg.textContent = "Select PPE items in the correct gowning order.";
+        if (ppePanel) ppePanel.style.display = 'flex';
+        if (vrPpePanel) vrPpePanel.setAttribute('visible', true);
+        const txt = "Select PPE items in the correct gowning order.";
+        if (ppeMsg) ppeMsg.textContent = txt;
+        if (vrPpeMsg) vrPpeMsg.setAttribute('value', txt);
       };
 
       ppeAudio.play().catch(() => {
-        // if blocked
-        ppePanel.style.display = 'flex';
-        ppeMsg.textContent = "Select PPE items in the correct gowning order.";
+        if (ppePanel) ppePanel.style.display = 'flex';
+        if (vrPpePanel) vrPpePanel.setAttribute('visible', true);
+        const txt = "Select PPE items in the correct gowning order.";
+        if (ppeMsg) ppeMsg.textContent = txt;
+        if (vrPpeMsg) vrPpeMsg.setAttribute('value', txt);
       });
+    });
+  }
+
+  // VR PPE toggle triggers same logic
+  if (vrPpeToggle) {
+    vrPpeToggle.addEventListener('click', () => {
+      if (ppeToggle) ppeToggle.click();
     });
   }
 
@@ -277,27 +378,12 @@
     });
   }
 
+  // Attach click to ALL PPE items (desktop + VR)
   ppeItems.forEach(el => {
     el.addEventListener('click', () => {
-      if (!currentPpeOrder || !currentPpeOrder.length) return;
-      if (ppePanel.style.display === 'none') return;
-
       const id = el.dataset.id;
-      const expected = currentPpeOrder[ppeStep];
-
-      if (id === expected) {
-        el.classList.add('selected');
-        el.style.opacity = '0.3';
-        ppeStep++;
-
-        if (ppeStep === currentPpeOrder.length) {
-          ppeMsg.textContent = "✅ Gowning sequence completed correctly. You are cleanroom ready!";
-        } else {
-          ppeMsg.textContent = `✔ Correct. Select step ${ppeStep + 1} next.`;
-        }
-      } else {
-        ppeMsg.textContent = "❌ Incorrect item. Re-check the gowning order and try again.";
-      }
+      if (!id) return;
+      handlePpeClick(id);
     });
   });
 
@@ -336,7 +422,7 @@
     btnEl.addEventListener('touchstart', listener);
   }
 
-  // Rotate nav panel to always face camera, but keep position fixed (so no "dancing")
+  // Rotate nav panel to always face camera
   function orientPanelToCamera() {
     if (!camera || !navPanel || !window.THREE) return;
     const camWorldPos = new THREE.Vector3();
@@ -347,7 +433,7 @@
     panelObj.getWorldPosition(panelPos);
 
     const lookAt = camWorldPos.clone();
-    lookAt.y = panelPos.y; // same height → no tilting up/down
+    lookAt.y = panelPos.y;
     panelObj.lookAt(lookAt);
   }
 
@@ -398,7 +484,7 @@
         img.src = `${ASSETS}${n}.jpg`;
       });
 
-      // Auto-play narration for this scene
+      // 🔊 Auto-play narration for this scene
       playSceneAudio(id);
 
       FADE.classList.remove('on');
@@ -427,6 +513,19 @@
     preloadAll();
     loadScene(START);
     setTimeout(() => tickOrient(), 120);
+
+    // Retry audio when entering VR (Quest) if blocked before
+    const sceneEl = document.querySelector('a-scene');
+    if (sceneEl) {
+      sceneEl.addEventListener('enter-vr', () => {
+        if (!currentSceneId) return;
+        if (currentAudio && currentAudio.paused) {
+          currentAudio.play().catch(()=>{});
+        } else if (!currentAudio) {
+          playSceneAudio(currentSceneId);
+        }
+      });
+    }
   });
 
 })();
