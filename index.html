@@ -19,7 +19,7 @@
     }
     #fade.on { opacity:1; pointer-events:auto; }
 
-    /* ============ AUDIO UI (TOP RIGHT) ============ */
+    /* ============ AUDIO UI (TOP RIGHT, DESKTOP) ============ */
     #audioUI {
       position:fixed;
       top:16px;
@@ -53,11 +53,11 @@
       box-shadow:0 0 26px rgba(0,238,255,0.95);
     }
 
-    /* ============ SUBTITLES & PROGRESS ============ */
+    /* ============ SUBTITLES & PROGRESS (TOP CENTER) ============ */
     #subtitles {
       position:fixed;
+      top:16px;
       left:50%;
-      bottom:58px;
       transform:translateX(-50%);
       padding:10px 18px;
       max-width:72%;
@@ -72,8 +72,8 @@
     }
     #progressWrap {
       position:fixed;
+      top:56px;
       left:50%;
-      bottom:32px;
       transform:translateX(-50%);
       width:60%;
       height:6px;
@@ -91,7 +91,7 @@
       transition:width .2s linear;
     }
 
-    /* ============ PPE GAME UI (TOP LEFT) ============ */
+    /* ============ PPE GAME UI (TOP LEFT, DESKTOP) ============ */
     #ppeUI {
       position:fixed;
       top:90px;
@@ -200,19 +200,18 @@
 <body>
   <div id="fade"></div>
 
-  <!-- 🔊 AUDIO CONTROL OVERLAY -->
-  <!-- Icons must exist as Images/start.png, Images/stop.png, Images/replay.png -->
+  <!-- 🔊 AUDIO CONTROL OVERLAY (DESKTOP) -->
   <div id="audioUI">
     <button id="btnAudioPlay"   class="audioBtn"><img src="Images/start.png"  alt="Play"></button>
     <button id="btnAudioStop"   class="audioBtn"><img src="Images/stop.png"   alt="Stop"></button>
     <button id="btnAudioReplay" class="audioBtn"><img src="Images/replay.png" alt="Replay"></button>
   </div>
 
-  <!-- 📜 SUBTITLES + PROGRESS -->
+  <!-- 📜 SUBTITLES + PROGRESS (DESKTOP) -->
   <div id="subtitles"></div>
   <div id="progressWrap"><div id="progressBar"></div></div>
 
-  <!-- 🧤 PPE GAME OVERLAY (TOP LEFT) -->
+  <!-- 🧤 PPE GAME OVERLAY (DESKTOP) -->
   <div id="ppeUI">
     <button id="ppeToggle">Cleanroom PPE Test</button>
 
@@ -246,19 +245,107 @@
     <!-- SKY / PANORAMA -->
     <a-sky id="sky" radius="500" rotation="0 -90 0"></a-sky>
 
-    <!-- CAMERA + CURSOR (mouse + gaze) -->
+    <!-- CAMERA RIG + CURSOR + VR UI + CONTROLLERS -->
     <a-entity id="cameraRig">
+      <!-- Desktop camera + mouse cursor -->
       <a-entity id="camera" camera look-controls position="0 1.6 0">
-        <a-entity id="cursor" cursor="fuse:false; rayOrigin:mouse"
+        <a-entity id="cursor"
+                  cursor="fuse:false; rayOrigin:mouse"
                   raycaster="objects: .clickable"
                   position="0 0 -0.6"
                   geometry="primitive: ring; radiusInner:0.02; radiusOuter:0.035"
                   material="shader:flat; color:#fff">
         </a-entity>
+
+        <!-- 🔊 VR AUDIO CONTROLS (TOP RIGHT IN VIEW) -->
+        <a-entity id="vrAudioUI" position="0.65 0.45 -1.2" scale="0.6 0.6 0.6">
+          <a-plane width="1.4" height="0.32" color="#00141a" opacity="0.85"></a-plane>
+
+          <a-plane id="vrBtnAudioPlay"   class="clickable" position="-0.4 0 0.02"
+                   width="0.35" height="0.22" src="Images/start.png"></a-plane>
+          <a-plane id="vrBtnAudioStop"   class="clickable" position="0.0 0 0.02"
+                   width="0.35" height="0.22" src="Images/stop.png"></a-plane>
+          <a-plane id="vrBtnAudioReplay" class="clickable" position="0.4 0 0.02"
+                   width="0.35" height="0.22" src="Images/replay.png"></a-plane>
+        </a-entity>
+
+        <!-- 🧤 VR PPE TOGGLE (TOP LEFT) -->
+        <a-plane id="vrPpeToggle" class="clickable"
+                 position="-0.65 0.45 -1.2"
+                 width="0.7" height="0.22"
+                 color="#ffb300" opacity="0.95">
+        </a-plane>
+        <a-text value="Cleanroom PPE Test" color="#000"
+                width="1.8" align="center"
+                position="-0.65 0.45 -1.18"></a-text>
+
+        <!-- 🧤 VR PPE PANEL (BELOW TOP-LEFT) -->
+        <a-entity id="vrPpePanel" visible="false" position="-0.65 0.1 -1.3" scale="0.65 0.65 0.65">
+          <a-plane width="1.6" height="1.0" color="#000" opacity="0.85"></a-plane>
+          <a-text id="vrPpeMsg" value="Tap PPE in correct order."
+                  width="1.6" align="center" position="0 0.38 0.02" color="#ffd770"></a-text>
+
+          <!-- PPE grid in VR (same IDs / order) -->
+          <a-plane class="clickable ppe-item" data-id="ppe1"
+                   position="-0.6 0.15 0.02" width="0.28" height="0.28"
+                   src="Images/ppe_labcoat.png"></a-plane>
+          <a-plane class="clickable ppe-item" data-id="ppe2"
+                   position="-0.2 0.15 0.02" width="0.28" height="0.28"
+                   src="Images/ppe_shoe.png"></a-plane>
+          <a-plane class="clickable ppe-item" data-id="ppe3"
+                   position="0.2 0.15 0.02" width="0.28" height="0.28"
+                   src="Images/ppe_hairnet.png"></a-plane>
+          <a-plane class="clickable ppe-item" data-id="ppe4"
+                   position="0.6 0.15 0.02" width="0.28" height="0.28"
+                   src="Images/ppe_mask.png"></a-plane>
+
+          <a-plane class="clickable ppe-item" data-id="ppe5"
+                   position="-0.6 -0.15 0.02" width="0.28" height="0.28"
+                   src="Images/ppe_goggle.png"></a-plane>
+          <a-plane class="clickable ppe-item" data-id="ppe6"
+                   position="-0.2 -0.15 0.02" width="0.28" height="0.28"
+                   src="Images/ppe_gown.png"></a-plane>
+          <a-plane class="clickable ppe-item" data-id="ppe7"
+                   position="0.2 -0.15 0.02" width="0.28" height="0.28"
+                   src="Images/ppe_shoecover.png"></a-plane>
+          <a-plane class="clickable ppe-item" data-id="ppe8"
+                   position="0.6 -0.15 0.02" width="0.28" height="0.28"
+                   src="Images/ppe_boot.png"></a-plane>
+
+          <a-plane class="clickable ppe-item" data-id="ppe9"
+                   position="-0.3 -0.45 0.02" width="0.28" height="0.28"
+                   src="Images/ppe_purpleglove.png"></a-plane>
+          <a-plane class="clickable ppe-item" data-id="ppe10"
+                   position="0.3 -0.45 0.02" width="0.28" height="0.28"
+                   src="Images/ppe_glove_blue.png"></a-plane>
+        </a-entity>
+
+        <!-- 📜 VR SUBTITLES (TOP CENTER) -->
+        <a-plane id="vrSubBg" visible="false"
+                 position="0 0.45 -1.4"
+                 width="2.0" height="0.26"
+                 color="#000" opacity="0.7"></a-plane>
+        <a-text id="vrSubText" visible="false"
+                position="0 0.45 -1.38"
+                width="2.4" align="center"
+                color="#fff"></a-text>
+      </a-entity>
+
+      <!-- QUEST CONTROLLERS WITH STYLISH RAY -->
+      <a-entity id="leftHand"
+                laser-controls="hand: left"
+                raycaster="objects: .clickable; showLine: true; far: 30"
+                line="color:#ff00dd; opacity:0.95; width:0.02">
+      </a-entity>
+
+      <a-entity id="rightHand"
+                laser-controls="hand: right"
+                raycaster="objects: .clickable; showLine: true; far: 30"
+                line="color:#00eaff; opacity:0.95; width:0.02">
       </a-entity>
     </a-entity>
 
-    <!-- FLOOR LOGO (fixed bottom center) -->
+    <!-- FLOOR LOGO -->
     <a-plane id="floorLogo"
              position="0 0 0"
              rotation="-90 0 0"
@@ -267,7 +354,7 @@
              src="">
     </a-plane>
 
-    <!-- NAV PANEL (buttons sit above the logo; fixed in world, only rotates to face camera) -->
+    <!-- NAV PANEL (already working with controllers) -->
     <a-entity id="navPanel" position="0 0.22 -1.2">
       <a-plane id="btnPrev" class="clickable" width="1.0" height="0.8"
                position="-4 0 0" rotation="-90 0 0" material="transparent:true" visible="false"></a-plane>
